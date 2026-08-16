@@ -353,12 +353,12 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     let tab_grid_style = if state.active_tab == ActiveTab::WeekGrid {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White).add_modifier(Modifier::DIM)
+        Style::default().fg(Color::White)
     };
     let tab_cal_style = if state.active_tab == ActiveTab::MonthCalendar {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::White).add_modifier(Modifier::DIM)
+        Style::default().fg(Color::White)
     };
 
     let header_spans = vec![
