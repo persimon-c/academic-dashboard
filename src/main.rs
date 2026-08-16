@@ -584,29 +584,17 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
     let total_cells = start_col + last_of_month.day();
     let total_weeks = ((total_cells as f32) / 7.0).ceil() as usize;
 
-    // Centering layout: top spacer, calendar grid area, bottom spacer
-    // Weekday header is 1 line. Each week row is 3 lines high.
-    let grid_height = (total_weeks as u16 * 3) + 1;
-    let centering = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(0),
-            Constraint::Length(grid_height),
-            Constraint::Min(0),
-        ])
-        .split(area);
-
-    let grid_area = centering[1];
-
-    // Split the grid area: header row + week rows
-    let mut row_constraints = vec![Constraint::Length(1)];
+    // Split the main calendar area directly so rows stretch vertically:
+    // 2 lines for the weekday header area (adds a blank line spacer below it),
+    // and equal proportional splits for the week rows.
+    let mut row_constraints = vec![Constraint::Length(2)];
     for _ in 0..total_weeks {
-        row_constraints.push(Constraint::Length(3));
+        row_constraints.push(Constraint::Ratio(1, total_weeks as u32));
     }
     let calendar_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints(row_constraints)
-        .split(grid_area);
+        .split(area);
 
     // Render weekday headers using the same 7-column ratio layout as the cells
     // so labels are guaranteed to align at any terminal width.
