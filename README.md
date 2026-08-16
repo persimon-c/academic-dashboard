@@ -19,6 +19,17 @@ SMON OS operates on a **zero-overhead, read-only paradigm**—no data is generat
 
 ---
 
+## Tech Stack
+
+The dashboard is built from scratch in **Rust** for maximum performance, minimal footprint, and thread safety:
+
+- **UI Framework**: [ratatui](https://github.com/ratatui/ratatui) (v0.29) with [crossterm](https://github.com/crossterm-rs/crossterm) backend for raw terminal window rendering, custom layout configurations, and color handling.
+- **Data Threading**: [crossbeam-channel](https://github.com/crossbeam-rs/crossbeam) for non-blocking, multi-producer single-consumer (MPSC) live sync and event looping.
+- **Datetime Engine**: [chrono](https://github.com/chronotope/chrono) for handling timezone-aware parsing (UTC+8 Manila), chronotype day boundary shifts, and calendar layouts.
+- **Serialization**: [serde](https://github.com/serde-rs/serde) and `serde_json` for parsing local JSON metadata (todos, classroom assignments, git metrics).
+
+---
+
 ## How the Dashboard Leverages SMON OS Data
 
 The dashboard runs a background thread that periodically scans files in your vault to construct a unified view:
