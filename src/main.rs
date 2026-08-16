@@ -639,20 +639,29 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
 
                 let mut cell_style = Style::default();
                 if current_date == sel {
-                    cell_style = cell_style.bg(Color::Blue).fg(Color::White);
+                    // Deep dark navy blue background for selected day
+                    cell_style = cell_style.bg(Color::Rgb(20, 35, 65)).fg(Color::White);
                 } else if current_date == today {
-                    cell_style = cell_style.bg(Color::Cyan).fg(Color::Black);
+                    // Deep dark teal/cyan background for today
+                    cell_style = cell_style.bg(Color::Rgb(15, 45, 45)).fg(Color::Cyan);
                 } else if is_conflict {
                     cell_style = cell_style.fg(Color::Red);
                 }
 
-                // Determine contrasting style for indicators when cell has a filled background
-                let is_filled_bg = current_date == sel || current_date == today;
+                // Since backgrounds are now dark, we can use the default bright high-contrast colors!
                 let get_indicator_style = |default_color: Color| {
                     if current_date == sel {
-                        Style::default().fg(Color::White) // white indicators on blue background
+                        // High-contrast bright colors against dark navy
+                        Style::default().fg(match default_color {
+                            Color::Blue => Color::LightBlue,
+                            other => other,
+                        })
                     } else if current_date == today {
-                        Style::default().fg(Color::Black) // black indicators on cyan background
+                        // High-contrast bright colors against dark teal
+                        Style::default().fg(match default_color {
+                            Color::Blue => Color::LightBlue,
+                            other => other,
+                        })
                     } else {
                         Style::default().fg(default_color)
                     }
