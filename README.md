@@ -93,3 +93,5 @@ cargo build --release
 # Run the installed binary system-wide
 academic-dashboard --vault-path ~/smon-os
 ```
+
+this project was made to get to know rust
