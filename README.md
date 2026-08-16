@@ -32,6 +32,59 @@ The dashboard is built from scratch in **Rust** for maximum performance, minimal
 
 ---
 
+## Data Connections & Examples
+
+The dashboard acts as an interface layer over the local vault. Rather than utilizing a traditional database, the Rust binary reads structured files inside `~/smon-os/` directly:
+
+### 1. Attendance & Absence Limits
+* **Source Path**: `02_AREAS/academics/{COURSE}/Grading.md`
+* **How it connects**: The dashboard parses Markdown table headers looking for attendance weights and limits (e.g., maximum allowed absences before dropping).
+* **Format Example**:
+  ```markdown
+  ---
+  type: grading
+  course: "CS 101"
+  ---
+  | Component | Weight | Limit |
+  |---|---|---|
+  | Lecture Absences | 0% | Max 3 |
+  | Lab Absences | 0% | Max 2 |
+  ```
+
+### 2. Deadlines & Assignments
+* **Source Path**: `_AI/tracking/classroom-data.json`
+* **How it connects**: Synthesized by background API sync scripts, this JSON lists active course assignments, points, and due-dates.
+* **Format Example**:
+  ```json
+  {
+    "courses": [
+      {
+        "name": "CS 101",
+        "assignments": [
+          {
+            "id": "12345",
+            "title": "Lab Exercise 1",
+            "due": "2026-08-20T23:59:59+08:00",
+            "submitted": false
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+### 3. Sleep Tracker
+* **Source Path**: `_AI/tracking/sleep-log.csv`
+* **How it connects**: Parsed line-by-line using a CSV parser to fetch wake times, bedtimes, and overall duration.
+* **Format Example**:
+  ```csv
+  Date,Bedtime,Waketime,Quality,Notes
+  2026-08-15,02:00,08:30,Good,Felt rested
+  2026-08-16,03:00,09:00,Fair,Late study session
+  ```
+
+---
+
 ## How the Dashboard Leverages SMON OS Data
 
 The dashboard runs a background thread that periodically scans files in your vault to construct a unified view:
