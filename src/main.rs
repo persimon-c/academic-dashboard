@@ -578,7 +578,7 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
     };
     let last_of_month = next_month.pred_opt().unwrap();
     
-    let start_col = first_of_month.weekday().num_days_from_monday();
+    let start_col = first_of_month.weekday().num_days_from_sunday();
 
     let calendar_rows = Layout::default()
         .direction(Direction::Vertical)
@@ -599,7 +599,7 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
         .direction(Direction::Horizontal)
         .constraints([Constraint::Ratio(1, 7); 7])
         .split(calendar_rows[0]);
-    for (i, day_name) in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].iter().enumerate() {
+    for (i, day_name) in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].iter().enumerate() {
         f.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 format!(" {}", day_name),
