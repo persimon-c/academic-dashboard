@@ -353,12 +353,12 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     let tab_grid_style = if state.active_tab == ActiveTab::WeekGrid {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(Color::White).add_modifier(Modifier::DIM)
     };
     let tab_cal_style = if state.active_tab == ActiveTab::MonthCalendar {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(Color::White).add_modifier(Modifier::DIM)
     };
 
     let header_spans = vec![
@@ -367,7 +367,6 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         Span::styled(" \u{f009} Week Grid ", tab_grid_style),
         Span::raw("   "),
         Span::styled(" \u{f073} Month Calendar ", tab_cal_style),
-        Span::raw("  (Tab) "),
         Span::raw(" \u{e0b1} "),
         Span::raw(format!("{} {} day streak  best: {}{}{} ",
             streak_icon,
@@ -594,10 +593,21 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
         ])
         .split(area);
 
-    let days_header = Line::from(vec![
-        Span::raw(" Mon   Tue   Wed   Thu   Fri   Sat   Sun "),
-    ]);
-    f.render_widget(Paragraph::new(days_header), calendar_rows[0]);
+    // Render weekday headers using the same 7-column ratio layout as the cells
+    // so labels are guaranteed to align at any terminal width.
+    let header_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Ratio(1, 7); 7])
+        .split(calendar_rows[0]);
+    for (i, day_name) in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].iter().enumerate() {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!(" {}", day_name),
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            ))),
+            header_cols[i],
+        );
+    }
 
     let mut current_date = first_of_month;
     let mut grid_index = 0;
