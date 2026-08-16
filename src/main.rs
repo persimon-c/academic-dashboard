@@ -657,25 +657,28 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                     }
                 };
 
-                let mut indicators = Vec::new();
+                // Create spans: start with the day number (e.g. "10 ") to anchor Nerd Font icon sizes
+                let mut spans = vec![
+                    Span::raw(format!("{:02} ", current_date.day())),
+                ];
+
                 if is_conflict {
-                    indicators.push(Span::styled(" \u{f071}", get_indicator_style(Color::Red)));
+                    spans.push(Span::styled("\u{f071}", get_indicator_style(Color::Red)));
                 } else {
                     if has_exams {
-                        indicators.push(Span::styled(" \u{f040}", get_indicator_style(Color::Red)));
+                        spans.push(Span::styled("\u{f040} ", get_indicator_style(Color::Red)));
                     }
                     if has_deadline {
-                        indicators.push(Span::styled(" \u{f017}", get_indicator_style(Color::Cyan)));
+                        spans.push(Span::styled("\u{f017} ", get_indicator_style(Color::Cyan)));
                     }
                     if has_classes {
-                        indicators.push(Span::styled(" \u{f19d}", get_indicator_style(Color::Blue)));
+                        spans.push(Span::styled("\u{f19d} ", get_indicator_style(Color::Blue)));
                     }
                     if has_org {
-                        indicators.push(Span::styled(" \u{f0c0}", get_indicator_style(Color::Yellow)));
+                        spans.push(Span::styled("\u{f0c0} ", get_indicator_style(Color::Yellow)));
                     }
                 }
 
-                let title = format!(" {:02}", current_date.day());
                 let border_color = if is_conflict && current_date != sel {
                     Color::Red
                 } else if current_date == sel {
@@ -691,13 +694,13 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                 } else {
                     Color::Gray          // future empty: neutral
                 };
+
                 let cell_block = Block::default()
                     .borders(Borders::ALL)
-                    .border_style(Style::default().fg(border_color))
-                    .title(title);
+                    .border_style(Style::default().fg(border_color));
 
                 f.render_widget(
-                    Paragraph::new(Line::from(indicators))
+                    Paragraph::new(Line::from(spans))
                         .block(cell_block)
                         .style(cell_style),
                     cols[c],
