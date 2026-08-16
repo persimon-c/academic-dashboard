@@ -637,7 +637,7 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                 if current_date == sel {
                     cell_style = cell_style.bg(Color::Blue).fg(Color::White);
                 } else if current_date == Local::now().date_naive() {
-                    cell_style = cell_style.fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
+                    cell_style = cell_style.bg(Color::Cyan).fg(Color::Black);
                 } else if is_conflict {
                     cell_style = cell_style.fg(Color::Red);
                 }
