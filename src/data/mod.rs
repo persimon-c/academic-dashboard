@@ -10,6 +10,10 @@ pub mod attendance;
 pub mod deadlines;
 pub mod streak;
 pub mod sleep;
+pub mod rrule;
+pub mod exams;
+pub mod org;
+
 
 
 
