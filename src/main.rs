@@ -639,29 +639,19 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
 
                 let mut cell_style = Style::default();
                 if current_date == sel {
-                    // Deep dark navy blue background for selected day
-                    cell_style = cell_style.bg(Color::Rgb(20, 35, 65)).fg(Color::White);
+                    // Purple background for selected day
+                    cell_style = cell_style.bg(Color::Rgb(120, 50, 160)).fg(Color::White);
                 } else if current_date == today {
-                    // Deep dark teal/cyan background for today
-                    cell_style = cell_style.bg(Color::Rgb(15, 45, 45)).fg(Color::Cyan);
+                    // Pink/Magenta background for today
+                    cell_style = cell_style.bg(Color::Rgb(180, 50, 120)).fg(Color::White);
                 } else if is_conflict {
                     cell_style = cell_style.fg(Color::Red);
                 }
 
-                // Since backgrounds are now dark, we can use the default bright high-contrast colors!
+                // If cell is selected (purple) or today (pink), render indicators in high-contrast White
                 let get_indicator_style = |default_color: Color| {
-                    if current_date == sel {
-                        // High-contrast bright colors against dark navy
-                        Style::default().fg(match default_color {
-                            Color::Blue => Color::LightBlue,
-                            other => other,
-                        })
-                    } else if current_date == today {
-                        // High-contrast bright colors against dark teal
-                        Style::default().fg(match default_color {
-                            Color::Blue => Color::LightBlue,
-                            other => other,
-                        })
+                    if current_date == sel || current_date == today {
+                        Style::default().fg(Color::White)
                     } else {
                         Style::default().fg(default_color)
                     }
@@ -689,9 +679,9 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                 let border_color = if is_conflict && current_date != sel {
                     Color::Red
                 } else if current_date == sel {
-                    Color::Yellow
+                    Color::Rgb(120, 50, 160) // Purple border for selected
                 } else if current_date == today {
-                    Color::Cyan          // today always pops, even unselected
+                    Color::Rgb(180, 50, 120) // Pink/Magenta border for today
                 } else if has_any_event {
                     Color::White         // days with something on them stand out
                 } else if is_weekend {
