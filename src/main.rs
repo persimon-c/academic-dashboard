@@ -346,8 +346,8 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .split(size);
 
     // 1. Header with Tab indicators
-    let streak_icon = if state.data.streak.current_streak > 0 { "🔥" } else { "  " };
-    let freeze_indicator = if !state.data.streak.freeze_days.is_empty() { " ❄" } else { "" };
+    let streak_icon = if state.data.streak.current_streak > 0 { "[STREAK]" } else { "        " };
+    let freeze_indicator = if !state.data.streak.freeze_days.is_empty() { " [FREEZE]" } else { "" };
     
     let tab_grid_style = if state.active_tab == ActiveTab::WeekGrid {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
@@ -492,7 +492,7 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .collect();
 
     if pending.is_empty() {
-        dl_lines.push(Line::from(Span::styled("No pending deadlines 🎉", Style::default().fg(Color::Green))));
+        dl_lines.push(Line::from(Span::styled("No pending deadlines [DONE]", Style::default().fg(Color::Green))));
     } else {
         for d in pending {
             let days_left = d.due.signed_duration_since(now_manila).num_days();
@@ -536,12 +536,12 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
 
     // 3. Personal Bests
     let bests_text = Line::from(vec![
-        Span::styled("🏆 PERSONAL BESTS  ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("  🔥 Best streak: "),
+        Span::styled("[BEST RECORDS] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::raw("  Streak: "),
         Span::styled(format!("{} days", state.data.streak.best_streak), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
-        Span::raw("  │  🟢 Best git week: "),
+        Span::raw("  │  Git Best: "),
         Span::styled(format!("{} commits (W{})", state.data.bests.best_github_week, state.data.bests.best_github_week_num), Style::default().fg(Color::Green)),
-        Span::raw("  │  ✅ Best todo week: "),
+        Span::raw("  │  Todo Best: "),
         Span::styled(format!("{} done (W{})", state.data.bests.best_todo_week, state.data.bests.best_todo_week_num), Style::default().fg(Color::Yellow)),
     ]);
     f.render_widget(
@@ -679,14 +679,14 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
     let mut lines = Vec::new();
 
     lines.push(Line::from(vec![
-        Span::styled(format!("📅 DETAIL VIEW: {} ", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("[CAL] DETAIL VIEW: {} ", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     ]));
     lines.push(Line::from("─".repeat(area.width as usize)));
 
     // Warning banner for conflicts
     if has_exam_org_conflict(sel, &state.data.exam_events, &state.data.org_events) {
         lines.push(Line::from(Span::styled(
-            "⚠️  CRITICAL CONFLICT DETECTED: Org commitments clash with Exam prep!  ⚠️",
+            "[WARN] CRITICAL CONFLICT DETECTED: Org commitments clash with Exam prep!",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from("─".repeat(area.width as usize)));
@@ -697,7 +697,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|b| b.date == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("🏫 Scheduled Classes:", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled("[CLASS] Scheduled Classes:", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD))));
     if day_classes.is_empty() {
         lines.push(Line::from("  No classes scheduled"));
     } else {
@@ -718,13 +718,13 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|e| e.date == Some(sel))
         .collect();
 
-    lines.push(Line::from(Span::styled("📝 Exam Events:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled("[EXAM] Exam Events:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
     if day_exams.is_empty() {
         lines.push(Line::from("  No exams scheduled"));
     } else {
         for e in day_exams {
             lines.push(Line::from(vec![
-                Span::raw("  🔥 "),
+                Span::raw("  * "),
                 Span::styled(format!("[{}] ", e.course), Style::default().fg(Color::Cyan)),
                 Span::styled(e.label.clone(), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
             ]));
@@ -737,13 +737,13 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|o| o.date == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("👥 Org Commitments [ORG]:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled("[ORG] Org Commitments:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
     if day_org.is_empty() {
         lines.push(Line::from("  No org events scheduled"));
     } else {
         for o in day_org {
             lines.push(Line::from(vec![
-                Span::raw("  👥 "),
+                Span::raw("  * "),
                 Span::styled(o.label.clone(), Style::default().fg(Color::Yellow)),
                 Span::raw(format!(" (source: {})", o.source)),
             ]));
@@ -756,7 +756,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|d| d.due.date_naive() == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("⏳ Classroom Deadlines:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled("[TASK] Classroom Deadlines:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
     if day_deadlines.is_empty() {
         lines.push(Line::from("  No deadlines due"));
     } else {
@@ -767,7 +767,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
                 Span::styled(" [Pending]", Style::default().fg(Color::Red))
             };
             lines.push(Line::from(vec![
-                Span::raw("  ⏳ "),
+                Span::raw("  * "),
                 Span::styled(format!("[{}] ", d.course), Style::default().fg(Color::Cyan)),
                 Span::styled(d.title.clone(), Style::default()),
                 status_span,
