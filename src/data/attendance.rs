@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use regex::Regex;
 use crate::data::{DayMetric, MetricKind, ReaderError};
 use crate::data::gradejoin::normalize_course;
@@ -61,7 +61,11 @@ pub fn read_attendance_absences(path: &Path) -> Result<Vec<DayMetric>, ReaderErr
 
 fn parse_attendance_line(line: &str) -> Option<RawAttendanceEntry> {
     // Remove comments
-    let clean_line = line.replace(/<!--.*?-->/, "");
+    let clean_line = if let Some(idx) = line.find("<!--") {
+        line[..idx].trim()
+    } else {
+        line.trim()
+    };
     let body = clean_line.strip_prefix("- ")?.trim();
     let parts: Vec<&str> = body.split('|').map(|s| s.trim()).collect();
     if parts.len() < 3 {
@@ -155,7 +159,7 @@ pub fn get_attendance_status(
             course,
             lecture_absences: lec_abs,
             lab_absences: lab_abs,
-            lecture_limit,
+            lecture_limit: lec_limit,
             lab_limit,
         });
     }
