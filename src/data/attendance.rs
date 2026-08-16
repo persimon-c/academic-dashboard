@@ -12,6 +12,7 @@ pub struct CourseAttendanceStatus {
     pub lab_limit: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct RawAttendanceEntry {
     date_str: String,
