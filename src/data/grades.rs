@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::data::{DayMetric, MetricKind, ReaderError};
 use crate::data::gradejoin::{normalize_course, match_grade_to_component, GradingComponent};
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GradeReturnEntry {
     course: String,
