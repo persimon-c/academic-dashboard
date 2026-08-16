@@ -1,7 +1,7 @@
 use std::path::Path;
-use chrono::{DateTime, FixedOffset, TimeZone};
+use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
-use crate::data::{DayMetric, MetricKind, ReaderError};
+use crate::data::ReaderError;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Deadline {
