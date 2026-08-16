@@ -1,4 +1,6 @@
-# Academic Dashboard (TUI)
+# SMON OS Academic Dashboard
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a29753e4-5f93-4831-a692-f5836cbc96f7" />
 
 > [!WARNING]
 > This TUI is hardwired specifically for **SMON OS (Simone's Second Brain)**. It expects a strict vault layout, file locations, and parsing formats. Running it outside the context of SMON OS will fail.
