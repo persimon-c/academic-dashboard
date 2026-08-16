@@ -2,9 +2,12 @@ pub mod data;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration as StdDuration;
 use clap::Parser;
 use chrono::{Local, FixedOffset, NaiveDate, Days, Datelike};
 use crossterm::event::{self, Event, KeyCode};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -26,7 +29,7 @@ use crate::data::rrule::{expand_schedule, ClassBlock};
 use crate::data::exams::{read_exam_events, ExamEvent};
 use crate::data::org::{read_org_events, OrgEvent};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[arg(short, long, default_value = "/home/simone/smon-os")]
@@ -46,7 +49,8 @@ enum ActiveTab {
     MonthCalendar,
 }
 
-struct AppState {
+/// Dynamic components reloaded in the background sync thread
+struct LoadedData {
     weekly_github: [u32; 18],
     weekly_todos: [u32; 18],
     weekly_grades: [u32; 18],
@@ -58,15 +62,23 @@ struct AppState {
     class_schedule: Vec<ClassBlock>,
     exam_events: Vec<ExamEvent>,
     org_events: Vec<OrgEvent>,
-    active_tab: ActiveTab,
-    selected_date: NaiveDate,
     error_message: Option<String>,
+    last_synced: String,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+enum AppEvent {
+    Key(crossterm::event::KeyEvent),
+    DataLoaded(LoadedData),
+    Tick,
+}
 
-    // Paths
+struct AppState {
+    data: LoadedData,
+    active_tab: ActiveTab,
+    selected_date: NaiveDate,
+}
+
+fn load_all_data(args: &Args) -> LoadedData {
     let github_path     = args.vault_path.join("_AI/tracking/github-contributions.csv");
     let todos_path      = args.vault_path.join("_AI/todos/todos.md");
     let grades_path     = args.vault_path.join("_AI/tracking/grade-returns.json");
@@ -79,7 +91,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let exams_path      = args.vault_path.join("02_AREAS/academics/ExamSeasons.md");
     let org_dir         = args.vault_path.join("02_AREAS/org/COSS/events");
 
-    // ── Load data ──────────────────────────────────────────────────────────────
     let mut weekly_github = [0u32; 18];
     let mut weekly_todos  = [0u32; 18];
     let mut weekly_grades = [0u32; 18];
@@ -144,14 +155,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => vec![],
     };
 
-    // ── Streak ─────────────────────────────────────────────────────────────────
     let holiday_days = load_holiday_days(&no_class_path);
     let semester_start = NaiveDate::parse_from_str(SEMESTER_START_DATE, "%Y-%m-%d")
         .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2026, 8, 3).unwrap());
     let today = Local::now().date_naive();
     let streak = compute_streak(&active_days, &holiday_days, semester_start, today);
 
-    // ── Personal Bests ─────────────────────────────────────────────────────────
     let (best_github_week, best_github_week_num) = weekly_github
         .iter().enumerate()
         .max_by_key(|(_, v)| *v)
@@ -171,27 +180,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         best_todo_week_num,
     };
 
-    // ── Class Schedule ─────────────────────────────────────────────────────────
-    // Expand class occurrences for the semester bounds (August 3 to December 7, 2026)
     let sem_end = NaiveDate::from_ymd_opt(2026, 12, 7).unwrap();
     let class_schedule = match expand_schedule(&ics_path, semester_start, sem_end) {
         Ok(s) => s,
         Err(e) => { push_error(format!("Schedule ICS: {}", e)); vec![] }
     };
 
-    // ── Exams ──────────────────────────────────────────────────────────────────
     let exam_events = match read_exam_events(&exams_path) {
         Ok(e) => e,
         Err(e) => { push_error(format!("Exams: {}", e)); vec![] }
     };
 
-    // ── Org events ─────────────────────────────────────────────────────────────
     let org_events = match read_org_events(&org_dir) {
         Ok(o) => o,
         Err(e) => { push_error(format!("Org: {}", e)); vec![] }
     };
 
-    let state = AppState {
+    LoadedData {
         weekly_github,
         weekly_todos,
         weekly_grades,
@@ -203,10 +208,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         class_schedule,
         exam_events,
         org_events,
-        active_tab: ActiveTab::WeekGrid,
-        selected_date: today,
         error_message,
+        last_synced: Local::now().format("%H:%M:%S").to_string(),
+    }
+}
+
+/// Detects if an exam overlaps with or is within 2 days of an org event.
+fn has_exam_org_conflict(d: NaiveDate, exams: &[ExamEvent], orgs: &[OrgEvent]) -> bool {
+    let has_exam_near = exams.iter().any(|e| {
+        if let Some(ed) = e.date {
+            (ed - d).num_days().abs() <= 2
+        } else {
+            false
+        }
+    });
+    let has_org_near = orgs.iter().any(|o| (o.date - d).num_days().abs() <= 2);
+    has_exam_near && has_org_near
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    let initial_data = load_all_data(&args);
+
+    let mut state = AppState {
+        data: initial_data,
+        active_tab: ActiveTab::WeekGrid,
+        selected_date: Local::now().date_naive(),
     };
+
+    // ── Channel infrastructure ──────────────────────────────────────────────────
+    let (tx, rx): (Sender<AppEvent>, Receiver<AppEvent>) = unbounded();
+
+    // 1. Spawning terminal key input thread
+    let tx_keys = tx.clone();
+    thread::spawn(move || {
+        loop {
+            if event::poll(StdDuration::from_millis(100)).unwrap_or(false) {
+                if let Ok(Event::Key(key)) = event::read() {
+                    let _ = tx_keys.send(AppEvent::Key(key));
+                }
+            }
+        }
+    });
+
+    // 2. Spawning ticker thread (for clean dynamic UI refresh)
+    let tx_tick = tx.clone();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(StdDuration::from_millis(1000));
+            let _ = tx_tick.send(AppEvent::Tick);
+        }
+    });
+
+    // 3. Spawning non-blocking file sync background thread (polls every 30s)
+    let tx_sync = tx.clone();
+    let sync_args = args.clone();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(StdDuration::from_secs(30));
+            let fresh_data = load_all_data(&sync_args);
+            let _ = tx_sync.send(AppEvent::DataLoaded(fresh_data));
+        }
+    });
 
     // ── TUI setup ──────────────────────────────────────────────────────────────
     crossterm::terminal::enable_raw_mode()?;
@@ -215,26 +278,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = run_app(&mut terminal, state);
-
-    crossterm::terminal::disable_raw_mode()?;
-    crossterm::execute!(terminal.backend_mut(), crossterm::terminal::LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res { eprintln!("Error: {:?}", err); }
-    Ok(())
-}
-
-fn run_app<B: ratatui::backend::Backend>(
-    terminal: &mut Terminal<B>,
-    mut state: AppState,
-) -> std::io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &state))?;
-        if event::poll(std::time::Duration::from_millis(250))? {
-            if let Event::Key(key) = event::read()? {
+        
+        match rx.recv() {
+            Ok(AppEvent::Key(key)) => {
                 match key.code {
-                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('q') => break,
                     KeyCode::Tab => {
                         state.active_tab = match state.active_tab {
                             ActiveTab::WeekGrid => ActiveTab::MonthCalendar,
@@ -264,8 +314,21 @@ fn run_app<B: ratatui::backend::Backend>(
                     _ => {}
                 }
             }
+            Ok(AppEvent::DataLoaded(fresh_data)) => {
+                state.data = fresh_data;
+            }
+            Ok(AppEvent::Tick) => {
+                // Just triggers redrawing to update clock / sync timing
+            }
+            Err(_) => break,
         }
     }
+
+    crossterm::terminal::disable_raw_mode()?;
+    crossterm::execute!(terminal.backend_mut(), crossterm::terminal::LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    Ok(())
 }
 
 fn ui(f: &mut ratatui::Frame, state: &AppState) {
@@ -283,8 +346,8 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .split(size);
 
     // 1. Header with Tab indicators
-    let streak_icon = if state.streak.current_streak > 0 { "🔥" } else { "  " };
-    let freeze_indicator = if !state.streak.freeze_days.is_empty() { " ❄" } else { "" };
+    let streak_icon = if state.data.streak.current_streak > 0 { "🔥" } else { "  " };
+    let freeze_indicator = if !state.data.streak.freeze_days.is_empty() { " ❄" } else { "" };
     
     let tab_grid_style = if state.active_tab == ActiveTab::WeekGrid {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
@@ -307,10 +370,10 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         Span::raw(" │ "),
         Span::raw(format!("{} {}{} day streak (best: {}){} ", 
             streak_icon, 
-            state.streak.current_streak, 
-            state.streak.best_streak, 
+            state.data.streak.current_streak, 
+            state.data.streak.best_streak, 
             freeze_indicator,
-            if !state.streak.holiday_protected_days.is_empty() { " [protected]" } else { "" }
+            if !state.data.streak.holiday_protected_days.is_empty() { " [protected]" } else { "" }
         )),
     ];
 
@@ -327,7 +390,6 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     // Left pane: conditional on ActiveTab
     match state.active_tab {
         ActiveTab::WeekGrid => {
-            // Week Grid (3 rows × 6 cols = 18 weeks)
             let grid_rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Ratio(1, 3); 3])
@@ -342,9 +404,9 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
                 for col in 0..6usize {
                     let wi = row * 6 + col;
                     let week_num = wi + 1;
-                    let git_val  = state.weekly_github[wi];
-                    let todo_val = state.weekly_todos[wi];
-                    let grad_val = state.weekly_grades[wi];
+                    let git_val  = state.data.weekly_github[wi];
+                    let todo_val = state.data.weekly_todos[wi];
+                    let grad_val = state.data.weekly_grades[wi];
 
                     let has_activity = git_val > 0 || todo_val > 0 || grad_val > 0;
                     let title_style = if has_activity {
@@ -378,36 +440,32 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
             }
         }
         ActiveTab::MonthCalendar => {
-            // Split Calendar area into Calendar Grid (60%) and Selected Day Details (40%)
             let cal_split = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
                 .split(body[0]);
 
-            // Draw month grid
             draw_month_calendar(f, state, cal_split[0]);
-            
-            // Draw details of the selected date
             draw_day_details(f, state, cal_split[1]);
         }
     }
 
-    // Right Sidebar: Attendance + Deadlines + Sleep
+    // Right Sidebar
     let sidebar = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(35), // Attendance
-            Constraint::Percentage(40), // Deadlines
-            Constraint::Percentage(25), // Sleep
+            Constraint::Percentage(35),
+            Constraint::Percentage(40),
+            Constraint::Percentage(25),
         ])
         .split(body[1]);
 
     // Attendance
     let mut att_lines = Vec::new();
-    if state.attendance_status.is_empty() {
+    if state.data.attendance_status.is_empty() {
         att_lines.push(Line::from(Span::styled("No absences logged", Style::default().fg(Color::Green))));
     } else {
-        for s in &state.attendance_status {
+        for s in &state.data.attendance_status {
             let lec_pct = if s.lecture_limit > 0 { s.lecture_absences as f32 / s.lecture_limit as f32 } else { 0.0 };
             let lec_col = if lec_pct >= 0.75 { Color::Red } else if lec_pct >= 0.5 { Color::Yellow } else { Color::Green };
             att_lines.push(Line::from(vec![
@@ -427,7 +485,7 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     // Deadlines
     let now_manila = Local::now().with_timezone(&FixedOffset::east_opt(8 * 3600).unwrap());
     let mut dl_lines = Vec::new();
-    let pending: Vec<&Deadline> = state.upcoming_deadlines
+    let pending: Vec<&Deadline> = state.data.upcoming_deadlines
         .iter()
         .filter(|d| !d.submitted && d.submission_state != "returned")
         .take(5)
@@ -454,7 +512,7 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     );
 
     // Sleep
-    let last_sleep: Vec<&SleepEntry> = state.sleep_entries.iter().rev().take(3).collect();
+    let last_sleep: Vec<&SleepEntry> = state.data.sleep_entries.iter().rev().take(3).collect();
     let mut sleep_lines = Vec::new();
     if last_sleep.is_empty() {
         sleep_lines.push(Line::from(Span::raw("No sleep data")));
@@ -480,11 +538,11 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     let bests_text = Line::from(vec![
         Span::styled("🏆 PERSONAL BESTS  ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         Span::raw("  🔥 Best streak: "),
-        Span::styled(format!("{} days", state.streak.best_streak), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{} days", state.data.streak.best_streak), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
         Span::raw("  │  🟢 Best git week: "),
-        Span::styled(format!("{} commits (W{})", state.bests.best_github_week, state.bests.best_github_week_num), Style::default().fg(Color::Green)),
+        Span::styled(format!("{} commits (W{})", state.data.bests.best_github_week, state.data.bests.best_github_week_num), Style::default().fg(Color::Green)),
         Span::raw("  │  ✅ Best todo week: "),
-        Span::styled(format!("{} done (W{})", state.bests.best_todo_week, state.bests.best_todo_week_num), Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{} done (W{})", state.data.bests.best_todo_week, state.data.bests.best_todo_week_num), Style::default().fg(Color::Yellow)),
     ]);
     f.render_widget(
         Paragraph::new(bests_text).block(Block::default().borders(Borders::ALL).title("Hall of Fame")),
@@ -492,12 +550,12 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     );
 
     // 4. Status Bar
-    let status_text = if let Some(ref err) = state.error_message {
+    let status_text = if let Some(ref err) = state.data.error_message {
         Line::from(vec![Span::styled("⚠ ", Style::default().fg(Color::Red)), Span::raw(err)])
     } else {
         Line::from(vec![
             Span::styled("● SYSTEM HEALTHY", Style::default().fg(Color::Green)),
-            Span::raw("  Tab: Toggle View  │  Arrows: Move Selection  │  Press 'q' to Exit"),
+            Span::raw(format!("  Sync: {}  │  Tab: Toggle View  │  Arrows: Select Day  │  'q' to Exit", state.data.last_synced)),
         ])
     };
     f.render_widget(
@@ -506,10 +564,8 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     );
 }
 
-/// Render a monthly calendar calendar grid based on the selected day
 fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
     let sel = state.selected_date;
-    // Determine the month bounds
     let year = sel.year();
     let month = sel.month();
     
@@ -521,14 +577,12 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
     };
     let last_of_month = next_month.pred_opt().unwrap();
     
-    // Day of week of the first day (0-indexed starting at Monday)
     let start_col = first_of_month.weekday().num_days_from_monday();
 
-    // Render calendar grid layout (6 rows, 7 columns)
     let calendar_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Weekday headers
+            Constraint::Length(1),
             Constraint::Ratio(1, 6),
             Constraint::Ratio(1, 6),
             Constraint::Ratio(1, 6),
@@ -538,7 +592,6 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
         ])
         .split(area);
 
-    // Render Weekday Header labels
     let days_header = Line::from(vec![
         Span::raw(" Mon   Tue   Wed   Thu   Fri   Sat   Sun "),
     ]);
@@ -547,7 +600,6 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
     let mut current_date = first_of_month;
     let mut grid_index = 0;
     
-    // We walk up to 42 spots (6 rows * 7 cols)
     for r in 0..6 {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
@@ -556,46 +608,56 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
 
         for c in 0..7 {
             if grid_index < start_col || current_date > last_of_month {
-                // Empty boundary cell
                 f.render_widget(
                     Paragraph::new("").block(Block::default().borders(Borders::NONE)),
                     cols[c],
                 );
             } else {
-                // This is a calendar day. Let's see what events fall on this day
-                let has_classes = state.class_schedule.iter().any(|b| b.date == current_date);
-                let has_exams = state.exam_events.iter().any(|e| e.date == Some(current_date));
-                let has_org = state.org_events.iter().any(|o| o.date == current_date);
-                let has_deadline = state.upcoming_deadlines.iter().any(|d| d.due.date_naive() == current_date);
+                let has_classes = state.data.class_schedule.iter().any(|b| b.date == current_date);
+                let has_exams = state.data.exam_events.iter().any(|e| e.date == Some(current_date));
+                let has_org = state.data.org_events.iter().any(|o| o.date == current_date);
+                let has_deadline = state.data.upcoming_deadlines.iter().any(|d| d.due.date_naive() == current_date);
+                
+                // Highlight conflict day (Exam + Org event near each other)
+                let is_conflict = has_exam_org_conflict(current_date, &state.data.exam_events, &state.data.org_events);
 
-                // Construct text labels inside the day cell
                 let mut cell_style = Style::default();
                 if current_date == sel {
-                    // Highlight selected date
                     cell_style = cell_style.bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD);
                 } else if current_date == Local::now().date_naive() {
-                    // Highlight today
                     cell_style = cell_style.fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
+                } else if is_conflict {
+                    cell_style = cell_style.fg(Color::Red).add_modifier(Modifier::BOLD);
                 }
 
                 let mut indicators = Vec::new();
-                if has_exams {
-                    indicators.push(Span::styled(" [E]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
-                }
-                if has_deadline {
-                    indicators.push(Span::styled(" [D]", Style::default().fg(Color::Cyan)));
-                }
-                if has_classes {
-                    indicators.push(Span::styled(" [C]", Style::default().fg(Color::Blue)));
-                }
-                if has_org {
-                    indicators.push(Span::styled(" [O]", Style::default().fg(Color::Yellow)));
+                if is_conflict {
+                    indicators.push(Span::styled(" [!]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                } else {
+                    if has_exams {
+                        indicators.push(Span::styled(" [E]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                    }
+                    if has_deadline {
+                        indicators.push(Span::styled(" [D]", Style::default().fg(Color::Cyan)));
+                    }
+                    if has_classes {
+                        indicators.push(Span::styled(" [C]", Style::default().fg(Color::Blue)));
+                    }
+                    if has_org {
+                        indicators.push(Span::styled(" [O]", Style::default().fg(Color::Yellow)));
+                    }
                 }
 
                 let title = format!(" {:02}", current_date.day());
                 let cell_block = Block::default()
                     .borders(Borders::ALL)
-                    .border_style(if current_date == sel { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::DarkGray) })
+                    .border_style(if is_conflict && current_date != sel {
+                        Style::default().fg(Color::Red)
+                    } else if current_date == sel {
+                        Style::default().fg(Color::Yellow)
+                    } else {
+                        Style::default().fg(Color::DarkGray)
+                    })
                     .title(title);
 
                 f.render_widget(
@@ -612,19 +674,26 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
     }
 }
 
-/// Render details for the selected day in a dedicated side panel
 fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::layout::Rect) {
     let sel = state.selected_date;
     let mut lines = Vec::new();
 
-    // 1. Header of details panel
     lines.push(Line::from(vec![
         Span::styled(format!("📅 DETAIL VIEW: {} ", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     ]));
     lines.push(Line::from("─".repeat(area.width as usize)));
 
-    // 2. Add classes on this day
-    let day_classes: Vec<&ClassBlock> = state.class_schedule.iter()
+    // Warning banner for conflicts
+    if has_exam_org_conflict(sel, &state.data.exam_events, &state.data.org_events) {
+        lines.push(Line::from(Span::styled(
+            "⚠️  CRITICAL CONFLICT DETECTED: Org commitments clash with Exam prep!  ⚠️",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from("─".repeat(area.width as usize)));
+    }
+
+    // Classes
+    let day_classes: Vec<&ClassBlock> = state.data.class_schedule.iter()
         .filter(|b| b.date == sel)
         .collect();
 
@@ -644,8 +713,8 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
     }
     lines.push(Line::from(""));
 
-    // 3. Add exam events on this day
-    let day_exams: Vec<&ExamEvent> = state.exam_events.iter()
+    // Exams
+    let day_exams: Vec<&ExamEvent> = state.data.exam_events.iter()
         .filter(|e| e.date == Some(sel))
         .collect();
 
@@ -663,8 +732,8 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
     }
     lines.push(Line::from(""));
 
-    // 4. Add org events on this day
-    let day_org: Vec<&OrgEvent> = state.org_events.iter()
+    // Org events
+    let day_org: Vec<&OrgEvent> = state.data.org_events.iter()
         .filter(|o| o.date == sel)
         .collect();
 
@@ -682,8 +751,8 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
     }
     lines.push(Line::from(""));
 
-    // 5. Add deadlines due on this day
-    let day_deadlines: Vec<&Deadline> = state.upcoming_deadlines.iter()
+    // Deadlines
+    let day_deadlines: Vec<&Deadline> = state.data.upcoming_deadlines.iter()
         .filter(|d| d.due.date_naive() == sel)
         .collect();
 
