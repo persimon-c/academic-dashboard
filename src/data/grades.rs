@@ -176,12 +176,12 @@ mod tests {
 
         writeln!(
             file,
-            "---\ntype: grading\ncourse: \"CMSC 124\"\n---\n| Component | Weight | Category |\n|---|---|---|\n| Quizzes | 10% | Lecture |\n| Lab Exercises | 35% | Lab |"
+            "---\ntype: grading\ncourse: \"CS 101\"\n---\n| Component | Weight | Category |\n|---|---|---|\n| Quizzes | 10% | Lecture |\n| Lab Exercises | 35% | Lab |"
         )
         .unwrap();
 
         let grading = parse_grading_md(&file_path).unwrap();
-        assert_eq!(grading.course_name, "CMSC 124");
+        assert_eq!(grading.course_name, "CS 101");
         assert_eq!(grading.components.len(), 2);
         assert_eq!(grading.components[0].name, "Quizzes");
         assert_eq!(grading.components[0].weight_percent, 10.0);

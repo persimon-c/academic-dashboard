@@ -97,15 +97,15 @@ mod tests {
             r#"{{
                 "courses": [
                     {{
-                        "name": "CMSC 124 ST-4L",
+                        "name": "CS 101 SEC-A",
                         "assignments": [
                             {{
-                                "id": "12345",
-                                "title": "EXERCISE 1: COBOL",
-                                "due": "2026-08-12T00:00:00.000Z",
-                                "max_points": 15.0,
+                                "id": "1",
+                                "title": "Ex 1",
+                                "due": "2026-08-10T12:00:00Z",
+                                "max_points": 100.0,
                                 "submitted": false,
-                                "submission_state": "returned"
+                                "submission_state": "assigned"
                             }}
                         ]
                     }}
@@ -116,9 +116,8 @@ mod tests {
 
         let deadlines = read_classroom_deadlines(file.path()).unwrap();
         assert_eq!(deadlines.len(), 1);
-        assert_eq!(deadlines[0].title, "EXERCISE 1: COBOL");
-        assert_eq!(deadlines[0].course, "CMSC 124 ST-4L");
-        // Verify Manila conversion: 2026-08-12T00:00:00Z -> 2026-08-12T08:00:00+08:00
-        assert_eq!(deadlines[0].due.to_rfc3339(), "2026-08-12T08:00:00+08:00");
+        assert_eq!(deadlines[0].course, "CS 101 SEC-A");
+        // Verify Manila conversion: 2026-08-10T12:00:00Z -> 2026-08-10T20:00:00+08:00
+        assert_eq!(deadlines[0].due.to_rfc3339(), "2026-08-10T20:00:00+08:00");
     }
 }

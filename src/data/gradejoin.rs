@@ -85,10 +85,10 @@ mod tests {
 
     #[test]
     fn test_normalize_course() {
-        assert_eq!(normalize_course("CMSC 124 ST-4L"), "CMSC 124");
-        assert_eq!(normalize_course("CMSC 124 1st Sem 2026-2027"), "CMSC 124");
-        assert_eq!(normalize_course("CMSC 132 Lab"), "CMSC 132");
-        assert_eq!(normalize_course("comm 10"), "COMM 10");
+        assert_eq!(normalize_course("CMSC 101 SEC-A"), "CMSC 101");
+        assert_eq!(normalize_course("CMSC 101 1st Sem 2026-2027"), "CMSC 101");
+        assert_eq!(normalize_course("CMSC 102 Lab"), "CMSC 102");
+        assert_eq!(normalize_course("comm 101"), "COMM 101");
     }
 
     #[test]
@@ -113,16 +113,16 @@ mod tests {
 
         // Quiz mapping
         let matched = match_grade_to_component(
-            "CMSC 124 1st Sem 2026-2027",
-            "Quiz 01 - Programming Languages and Categories",
+            "CMSC 101 1st Sem 2026-2027",
+            "Quiz 01 - Intro",
             &components,
         );
         assert_eq!(matched.unwrap().name, "Quizzes");
 
         // Lab Exercise mapping
         let matched = match_grade_to_component(
-            "CMSC 124 ST-4L",
-            "EXERCISE 1: COBOL",
+            "CMSC 101 SEC-A",
+            "EXERCISE 1: Code",
             &components,
         );
         assert_eq!(matched.unwrap().name, "Lab Exercises");

@@ -99,15 +99,17 @@ mod tests {
         writeln!(file, "# Exam Seasons").unwrap();
         writeln!(file, "| Course | Exam Type | Est. Week | Dates | Source |").unwrap();
         writeln!(file, "|---|---|---|---|---|").unwrap();
-        writeln!(file, "| CMSC 124 | Lecture Exam 1 | Week 5 | Sep 3 (Wed) | course guide |").unwrap();
-        writeln!(file, "| CMSC 125 | Exam 1 | Week 8 | Sep 25 (7–9 PM) | course site |").unwrap();
-        writeln!(file, "| CMSC 141 | — | — | — | TBD |").unwrap();
+        writeln!(file, "| CS 101 | Lecture Exam 1 | Week 5 | Sep 3 (Wed) | course guide |").unwrap();
+        writeln!(file, "| CS 102 | Exam 1 | Week 8 | Sep 25 (7–9 PM) | course site |").unwrap();
+        writeln!(file, "| CS 103 | — | — | — | TBD |").unwrap();
 
         let events = read_exam_events(file.path()).unwrap();
         // Exam entries (non-dash-date) should be parsed
         let with_date: Vec<_> = events.iter().filter(|e| e.date.is_some()).collect();
         assert_eq!(with_date.len(), 2);
         assert_eq!(with_date[0].date.unwrap(), NaiveDate::from_ymd_opt(2026, 9, 3).unwrap());
+        assert_eq!(with_date[0].course, "CS 101");
         assert_eq!(with_date[1].date.unwrap(), NaiveDate::from_ymd_opt(2026, 9, 25).unwrap());
+        assert_eq!(with_date[1].course, "CS 102");
     }
 }

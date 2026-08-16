@@ -179,8 +179,8 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "# Attendance Log").unwrap();
         writeln!(file, "## Absences").unwrap();
-        writeln!(file, "- 2026-08-11 | CMSC 124 ST-4L | lecture |  |  <!-- id:: 1 -->").unwrap();
-        writeln!(file, "- 2026-08-12 | CMSC 124 ST-4L | lab |  |  <!-- id:: 2 -->").unwrap();
+        writeln!(file, "- 2026-08-11 | CS 101 | lecture |  |  <!-- id:: 1 -->").unwrap();
+        writeln!(file, "- 2026-08-12 | CS 101 | lab |  |  <!-- id:: 2 -->").unwrap();
 
         let absences = read_attendance_absences(file.path()).unwrap();
         assert_eq!(absences.len(), 2);
