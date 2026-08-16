@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 use chrono::NaiveDate;
 
+pub mod github;
+pub mod todos;
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MetricKind {
     Github,
