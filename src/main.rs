@@ -346,9 +346,10 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .split(size);
 
     // 1. Header with Tab indicators
-    let streak_icon = if state.data.streak.current_streak > 0 { "[STREAK]" } else { "        " };
-    let freeze_indicator = if !state.data.streak.freeze_days.is_empty() { " [FREEZE]" } else { "" };
-    
+    // Nerd Font icons: \uf06d = fire, \uf2dc = snowflake
+    let streak_icon = if state.data.streak.current_streak > 0 { "\u{f06d}" } else { " " };
+    let freeze_indicator = if !state.data.streak.freeze_days.is_empty() { " \u{f2dc} freeze" } else { "" };
+
     let tab_grid_style = if state.active_tab == ActiveTab::WeekGrid {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
@@ -361,19 +362,19 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
     };
 
     let header_spans = vec![
-        Span::styled(" Academic Dashboard ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::raw(" │ "),
-        Span::styled(" [1] Week Grid ", tab_grid_style),
+        Span::styled(" \u{f02d} Academic Dashboard ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::raw(" \u{e0b1} "),
+        Span::styled(" \u{f009} Week Grid ", tab_grid_style),
         Span::raw("   "),
-        Span::styled(" [2] Month Calendar ", tab_cal_style),
-        Span::raw("  (Tab to Toggle) "),
-        Span::raw(" │ "),
-        Span::raw(format!("{} {}{} day streak (best: {}){} ", 
-            streak_icon, 
-            state.data.streak.current_streak, 
-            state.data.streak.best_streak, 
+        Span::styled(" \u{f073} Month Calendar ", tab_cal_style),
+        Span::raw("  (Tab) "),
+        Span::raw(" \u{e0b1} "),
+        Span::raw(format!("{} {} day streak  best: {}{}{} ",
+            streak_icon,
+            state.data.streak.current_streak,
+            state.data.streak.best_streak,
             freeze_indicator,
-            if !state.data.streak.holiday_protected_days.is_empty() { " [protected]" } else { "" }
+            if !state.data.streak.holiday_protected_days.is_empty() { " \u{f0c2} protected" } else { "" }
         )),
     ];
 
@@ -381,10 +382,10 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .block(Block::default().borders(Borders::ALL).title("Status"));
     f.render_widget(header, outer[0]);
 
-    // 2. Main body
+    // 2. Main body — 82% main area, 18% narrow sidebar
     let body = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .constraints([Constraint::Percentage(82), Constraint::Percentage(18)])
         .split(outer[1]);
 
     // Left pane: conditional on ActiveTab
@@ -440,9 +441,10 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
             }
         }
         ActiveTab::MonthCalendar => {
+            // 60% for the calendar grid, 40% for the day detail panel
             let cal_split = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+                .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
                 .split(body[0]);
 
             draw_month_calendar(f, state, cal_split[0]);
@@ -492,7 +494,7 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         .collect();
 
     if pending.is_empty() {
-        dl_lines.push(Line::from(Span::styled("No pending deadlines [DONE]", Style::default().fg(Color::Green))));
+        dl_lines.push(Line::from(Span::styled("\u{f058} All clear!", Style::default().fg(Color::Green))));
     } else {
         for d in pending {
             let days_left = d.due.signed_duration_since(now_manila).num_days();
@@ -534,32 +536,32 @@ fn ui(f: &mut ratatui::Frame, state: &AppState) {
         sidebar[2],
     );
 
-    // 3. Personal Bests
+    // 3. Personal Bests — \uf091 = trophy, \uf06d = fire, \uf09b = github, \uf0ae = tasks
     let bests_text = Line::from(vec![
-        Span::styled("[BEST RECORDS] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("  Streak: "),
+        Span::styled("\u{f091} PERSONAL BESTS ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::raw("  \u{f06d} streak: "),
         Span::styled(format!("{} days", state.data.streak.best_streak), Style::default().fg(Color::LightRed).add_modifier(Modifier::BOLD)),
-        Span::raw("  │  Git Best: "),
+        Span::raw("  \u{e0b1}  \u{f09b} git: "),
         Span::styled(format!("{} commits (W{})", state.data.bests.best_github_week, state.data.bests.best_github_week_num), Style::default().fg(Color::Green)),
-        Span::raw("  │  Todo Best: "),
+        Span::raw("  \u{e0b1}  \u{f0ae} todos: "),
         Span::styled(format!("{} done (W{})", state.data.bests.best_todo_week, state.data.bests.best_todo_week_num), Style::default().fg(Color::Yellow)),
     ]);
     f.render_widget(
-        Paragraph::new(bests_text).block(Block::default().borders(Borders::ALL).title("Hall of Fame")),
+        Paragraph::new(bests_text).block(Block::default().borders(Borders::ALL).title("\u{f091} Hall of Fame")),
         outer[2],
     );
 
-    // 4. Status Bar
+    // 4. Status Bar — \uf071 = warning, \uf058 = check circle, \uf017 = clock
     let status_text = if let Some(ref err) = state.data.error_message {
-        Line::from(vec![Span::styled("⚠ ", Style::default().fg(Color::Red)), Span::raw(err)])
+        Line::from(vec![Span::styled("\u{f071} ", Style::default().fg(Color::Red)), Span::raw(err)])
     } else {
         Line::from(vec![
-            Span::styled("● SYSTEM HEALTHY", Style::default().fg(Color::Green)),
-            Span::raw(format!("  Sync: {}  │  Tab: Toggle View  │  Arrows: Select Day  │  'q' to Exit", state.data.last_synced)),
+            Span::styled("\u{f058} HEALTHY", Style::default().fg(Color::Green)),
+            Span::raw(format!("  \u{f017} Sync: {}  \u{e0b1}  Tab: Toggle View  \u{e0b1}  Arrows: Select Day  \u{e0b1}  q: Exit", state.data.last_synced)),
         ])
     };
     f.render_widget(
-        Paragraph::new(status_text).block(Block::default().borders(Borders::ALL).title("Logs")),
+        Paragraph::new(status_text).block(Block::default().borders(Borders::ALL).title("\u{f108} Logs")),
         outer[3],
     );
 }
