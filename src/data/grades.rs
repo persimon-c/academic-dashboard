@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use chrono::NaiveDate;
 use regex::Regex;
 use serde::Deserialize;
@@ -138,7 +138,7 @@ pub fn read_grade_returns(
         // Find components and map
         let mut value = 0;
         if let Some(grading) = gradings.get(&norm_course) {
-            if let Some(component) = match_grade_to_component(&entry.course, &entry.assignment, &grading.components) {
+            if let Some(_component) = match_grade_to_component(&entry.course, &entry.assignment, &grading.components) {
                 // Return metric value can be scaled or represented simply as the count of grade returns for now,
                 // or the grade score itself, or weighted grade contribution.
                 // The week grid MVP specifies stacked bars for "grade returns" counts, so we use count (value = 1).
