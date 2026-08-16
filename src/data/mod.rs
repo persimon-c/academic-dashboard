@@ -8,7 +8,8 @@ pub mod gradejoin;
 pub mod grades;
 pub mod attendance;
 pub mod deadlines;
-
+pub mod streak;
+pub mod sleep;
 
 
 
