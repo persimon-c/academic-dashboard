@@ -635,11 +635,11 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
 
                 let mut cell_style = Style::default();
                 if current_date == sel {
-                    cell_style = cell_style.bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD);
+                    cell_style = cell_style.bg(Color::Blue).fg(Color::White);
                 } else if current_date == Local::now().date_naive() {
                     cell_style = cell_style.fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
                 } else if is_conflict {
-                    cell_style = cell_style.fg(Color::Red).add_modifier(Modifier::BOLD);
+                    cell_style = cell_style.fg(Color::Red);
                 }
 
                 // Nerd Font cell indicators:
@@ -647,10 +647,10 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                 // \uf19d = graduation cap/class, \uf0c0 = users/org
                 let mut indicators = Vec::new();
                 if is_conflict {
-                    indicators.push(Span::styled(" \u{f071}", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                    indicators.push(Span::styled(" \u{f071}", Style::default().fg(Color::Red)));
                 } else {
                     if has_exams {
-                        indicators.push(Span::styled(" \u{f040}", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                        indicators.push(Span::styled(" \u{f040}", Style::default().fg(Color::Red)));
                     }
                     if has_deadline {
                         indicators.push(Span::styled(" \u{f017}", Style::default().fg(Color::Cyan)));
