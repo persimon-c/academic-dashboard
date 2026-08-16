@@ -47,7 +47,7 @@ The dashboard functions as a visual utility layer reading straight from the loca
 The dashboard runs a background thread that periodically scans files in your vault to construct a unified view:
 
 - **Streak Engine**: Reads git commits and your `todos.md` file. It applies a **04:00 AM chronotype day boundary** (so late-night coding counts toward the previous day) and cross-references `NoClassDays.md` to ensure official holidays never break your streak or consume your weekly freeze (`❄`).
-- **Conflict Tracking**: Parses the `ExamSeasons.md` academic tables and cross-references them against `RecruitmentCycle-2026-27.md` from the COSS org folders. If an exam is within $\pm 2$ days of an org commitment, a conflict warning is triggered.
+- **Conflict Tracking**: Parses the `ExamSeasons.md` academic tables and cross-references them against `RecruitmentCycle-2026-27.md`. If an exam is within $\pm 2$ days of an org commitment, a conflict warning is triggered.
 - **Live Sync Channel**: Uses a non-blocking `crossbeam-channel` event loop to periodically re-scan the vault files in the background, updating your dashboard without interrupting navigation or freezing the terminal.
 
 ---
