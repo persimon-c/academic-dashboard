@@ -3,6 +3,8 @@ use chrono::NaiveDate;
 
 pub mod github;
 pub mod todos;
+pub mod calendar;
+
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
