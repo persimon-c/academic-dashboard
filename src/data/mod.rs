@@ -4,6 +4,11 @@ use chrono::NaiveDate;
 pub mod github;
 pub mod todos;
 pub mod calendar;
+pub mod gradejoin;
+pub mod grades;
+pub mod attendance;
+pub mod deadlines;
+
 
 
 
