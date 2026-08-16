@@ -708,7 +708,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
 
     // \uf073 = calendar
     lines.push(Line::from(vec![
-        Span::styled("\u{f073} ", Style::default().fg(Color::Yellow)),
+        Span::styled("\u{f073}  ", Style::default().fg(Color::Yellow)),
         Span::styled(format!("{}", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     ]));
     lines.push(Line::from("─".repeat(area.width as usize)));
@@ -730,7 +730,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
 
     // \uf19d = graduation cap
     lines.push(Line::from(vec![
-        Span::styled("\u{f19d} ", Style::default().fg(Color::Blue)),
+        Span::styled("\u{f19d}  ", Style::default().fg(Color::Blue)),
         Span::styled("Classes", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)),
     ]));
     if day_classes.is_empty() {
@@ -755,7 +755,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
 
     // \uf040 = pencil/exam
     lines.push(Line::from(vec![
-        Span::styled("\u{f040} ", Style::default().fg(Color::Red)),
+        Span::styled("\u{f040}  ", Style::default().fg(Color::Red)),
         Span::styled("Exams", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
     ]));
     if day_exams.is_empty() {
@@ -778,7 +778,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
 
     // \uf0c0 = users/org
     lines.push(Line::from(vec![
-        Span::styled("\u{f0c0} ", Style::default().fg(Color::Yellow)),
+        Span::styled("\u{f0c0}  ", Style::default().fg(Color::Yellow)),
         Span::styled("Org", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     ]));
     if day_org.is_empty() {
@@ -801,7 +801,7 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
 
     // \uf0ae = tasks list, \uf058 = check, \uf111 = circle dot
     lines.push(Line::from(vec![
-        Span::styled("\u{f0ae} ", Style::default().fg(Color::Cyan)),
+        Span::styled("\u{f0ae}  ", Style::default().fg(Color::Cyan)),
         Span::styled("Deadlines", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
     ]));
     if day_deadlines.is_empty() {
