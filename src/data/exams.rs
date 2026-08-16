@@ -32,7 +32,7 @@ pub fn read_exam_events(path: &Path) -> Result<Vec<ExamEvent>, ReaderError> {
     })?;
 
     // Match table rows: | Course | Exam Type | Est. Week | Dates | Source |
-    // e.g. | CMSC 124 | Lecture Exam 1 | Week 5 | Sep 3 (Wed) | course guide |
+    // e.g. | CS 101 | Lecture Exam 1 | Week 5 | Sep 3 (Wed) | course guide |
     let row_re = Regex::new(r"(?m)^\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|").unwrap();
 
     // Month name to number
