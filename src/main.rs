@@ -632,21 +632,24 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                     cell_style = cell_style.fg(Color::Red).add_modifier(Modifier::BOLD);
                 }
 
+                // Nerd Font cell indicators:
+                // \uf071 = warning, \uf040 = pencil/exam, \uf017 = clock/deadline
+                // \uf19d = graduation cap/class, \uf0c0 = users/org
                 let mut indicators = Vec::new();
                 if is_conflict {
-                    indicators.push(Span::styled(" [!]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                    indicators.push(Span::styled(" \u{f071}", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
                 } else {
                     if has_exams {
-                        indicators.push(Span::styled(" [E]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+                        indicators.push(Span::styled(" \u{f040}", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
                     }
                     if has_deadline {
-                        indicators.push(Span::styled(" [D]", Style::default().fg(Color::Cyan)));
+                        indicators.push(Span::styled(" \u{f017}", Style::default().fg(Color::Cyan)));
                     }
                     if has_classes {
-                        indicators.push(Span::styled(" [C]", Style::default().fg(Color::Blue)));
+                        indicators.push(Span::styled(" \u{f19d}", Style::default().fg(Color::Blue)));
                     }
                     if has_org {
-                        indicators.push(Span::styled(" [O]", Style::default().fg(Color::Yellow)));
+                        indicators.push(Span::styled(" \u{f0c0}", Style::default().fg(Color::Yellow)));
                     }
                 }
 
@@ -680,15 +683,18 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
     let sel = state.selected_date;
     let mut lines = Vec::new();
 
+    // \uf073 = calendar
     lines.push(Line::from(vec![
-        Span::styled(format!("[CAL] DETAIL VIEW: {} ", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled("\u{f073} ", Style::default().fg(Color::Yellow)),
+        Span::styled(format!("{}", sel.format("%A, %B %d, %Y")), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     ]));
     lines.push(Line::from("─".repeat(area.width as usize)));
 
     // Warning banner for conflicts
+    // \uf071 = warning triangle
     if has_exam_org_conflict(sel, &state.data.exam_events, &state.data.org_events) {
         lines.push(Line::from(Span::styled(
-            "[WARN] CRITICAL CONFLICT DETECTED: Org commitments clash with Exam prep!",
+            "\u{f071}  CONFLICT: Org event clashes with exam prep!",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from("─".repeat(area.width as usize)));
@@ -699,13 +705,17 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|b| b.date == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("[CLASS] Scheduled Classes:", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD))));
+    // \uf19d = graduation cap
+    lines.push(Line::from(vec![
+        Span::styled("\u{f19d} ", Style::default().fg(Color::Blue)),
+        Span::styled("Classes", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)),
+    ]));
     if day_classes.is_empty() {
         lines.push(Line::from("  No classes scheduled"));
     } else {
         for c in day_classes {
             lines.push(Line::from(vec![
-                Span::raw("  ● "),
+                Span::raw("  \u{f101} "),
                 Span::styled(format!("{}-{} ", c.start_time.format("%H:%M"), c.end_time.format("%H:%M")), Style::default().fg(Color::DarkGray)),
                 Span::styled(c.summary.clone(), Style::default().fg(Color::White)),
                 Span::raw(" @ "),
@@ -720,14 +730,18 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|e| e.date == Some(sel))
         .collect();
 
-    lines.push(Line::from(Span::styled("[EXAM] Exam Events:", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
+    // \uf040 = pencil/exam
+    lines.push(Line::from(vec![
+        Span::styled("\u{f040} ", Style::default().fg(Color::Red)),
+        Span::styled("Exams", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+    ]));
     if day_exams.is_empty() {
         lines.push(Line::from("  No exams scheduled"));
     } else {
         for e in day_exams {
             lines.push(Line::from(vec![
-                Span::raw("  * "),
-                Span::styled(format!("[{}] ", e.course), Style::default().fg(Color::Cyan)),
+                Span::raw("  \u{f101} "),
+                Span::styled(format!("{} ", e.course), Style::default().fg(Color::Cyan)),
                 Span::styled(e.label.clone(), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
             ]));
         }
@@ -739,15 +753,19 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|o| o.date == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("[ORG] Org Commitments:", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
+    // \uf0c0 = users/org
+    lines.push(Line::from(vec![
+        Span::styled("\u{f0c0} ", Style::default().fg(Color::Yellow)),
+        Span::styled("Org", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+    ]));
     if day_org.is_empty() {
-        lines.push(Line::from("  No org events scheduled"));
+        lines.push(Line::from("  No org events"));
     } else {
         for o in day_org {
             lines.push(Line::from(vec![
-                Span::raw("  * "),
+                Span::raw("  \u{f101} "),
                 Span::styled(o.label.clone(), Style::default().fg(Color::Yellow)),
-                Span::raw(format!(" (source: {})", o.source)),
+                Span::raw(format!(" ({})", o.source)),
             ]));
         }
     }
@@ -758,19 +776,23 @@ fn draw_day_details(f: &mut ratatui::Frame, state: &AppState, area: ratatui::lay
         .filter(|d| d.due.date_naive() == sel)
         .collect();
 
-    lines.push(Line::from(Span::styled("[TASK] Classroom Deadlines:", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))));
+    // \uf0ae = tasks list, \uf058 = check, \uf111 = circle dot
+    lines.push(Line::from(vec![
+        Span::styled("\u{f0ae} ", Style::default().fg(Color::Cyan)),
+        Span::styled("Deadlines", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    ]));
     if day_deadlines.is_empty() {
         lines.push(Line::from("  No deadlines due"));
     } else {
         for d in day_deadlines {
             let status_span = if d.submitted {
-                Span::styled(" [Done]", Style::default().fg(Color::Green))
+                Span::styled(" \u{f058}", Style::default().fg(Color::Green))
             } else {
-                Span::styled(" [Pending]", Style::default().fg(Color::Red))
+                Span::styled(" \u{f111}", Style::default().fg(Color::Red))
             };
             lines.push(Line::from(vec![
-                Span::raw("  * "),
-                Span::styled(format!("[{}] ", d.course), Style::default().fg(Color::Cyan)),
+                Span::raw("  \u{f101} "),
+                Span::styled(format!("{} ", d.course), Style::default().fg(Color::Cyan)),
                 Span::styled(d.title.clone(), Style::default()),
                 status_span,
             ]));
