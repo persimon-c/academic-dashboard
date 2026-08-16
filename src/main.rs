@@ -633,39 +633,48 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                 // Highlight conflict day (Exam + Org event near each other)
                 let is_conflict = has_exam_org_conflict(current_date, &state.data.exam_events, &state.data.org_events);
 
+                let today = Local::now().date_naive();
+                let is_weekend = matches!(current_date.weekday(), chrono::Weekday::Sat | chrono::Weekday::Sun);
+                let has_any_event = has_classes || has_exams || has_org || has_deadline;
+
                 let mut cell_style = Style::default();
                 if current_date == sel {
                     cell_style = cell_style.bg(Color::Blue).fg(Color::White);
-                } else if current_date == Local::now().date_naive() {
+                } else if current_date == today {
                     cell_style = cell_style.bg(Color::Cyan).fg(Color::Black);
                 } else if is_conflict {
                     cell_style = cell_style.fg(Color::Red);
                 }
 
-                // Nerd Font cell indicators:
-                // \uf071 = warning, \uf040 = pencil/exam, \uf017 = clock/deadline
-                // \uf19d = graduation cap/class, \uf0c0 = users/org
+                // Determine contrasting style for indicators when cell has a filled background
+                let is_filled_bg = current_date == sel || current_date == today;
+                let get_indicator_style = |default_color: Color| {
+                    if current_date == sel {
+                        Style::default().fg(Color::White) // white indicators on blue background
+                    } else if current_date == today {
+                        Style::default().fg(Color::Black) // black indicators on cyan background
+                    } else {
+                        Style::default().fg(default_color)
+                    }
+                };
+
                 let mut indicators = Vec::new();
                 if is_conflict {
-                    indicators.push(Span::styled(" \u{f071}", Style::default().fg(Color::Red)));
+                    indicators.push(Span::styled(" \u{f071}", get_indicator_style(Color::Red)));
                 } else {
                     if has_exams {
-                        indicators.push(Span::styled(" \u{f040}", Style::default().fg(Color::Red)));
+                        indicators.push(Span::styled(" \u{f040}", get_indicator_style(Color::Red)));
                     }
                     if has_deadline {
-                        indicators.push(Span::styled(" \u{f017}", Style::default().fg(Color::Cyan)));
+                        indicators.push(Span::styled(" \u{f017}", get_indicator_style(Color::Cyan)));
                     }
                     if has_classes {
-                        indicators.push(Span::styled(" \u{f19d}", Style::default().fg(Color::Blue)));
+                        indicators.push(Span::styled(" \u{f19d}", get_indicator_style(Color::Blue)));
                     }
                     if has_org {
-                        indicators.push(Span::styled(" \u{f0c0}", Style::default().fg(Color::Yellow)));
+                        indicators.push(Span::styled(" \u{f0c0}", get_indicator_style(Color::Yellow)));
                     }
                 }
-
-                let today = Local::now().date_naive();
-                let is_weekend = matches!(current_date.weekday(), chrono::Weekday::Sat | chrono::Weekday::Sun);
-                let has_any_event = has_classes || has_exams || has_org || has_deadline;
 
                 let title = format!(" {:02}", current_date.day());
                 let border_color = if is_conflict && current_date != sel {
