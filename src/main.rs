@@ -663,16 +663,29 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                     }
                 }
 
+                let today = Local::now().date_naive();
+                let is_weekend = matches!(current_date.weekday(), chrono::Weekday::Sat | chrono::Weekday::Sun);
+                let has_any_event = has_classes || has_exams || has_org || has_deadline;
+
                 let title = format!(" {:02}", current_date.day());
+                let border_color = if is_conflict && current_date != sel {
+                    Color::Red
+                } else if current_date == sel {
+                    Color::Yellow
+                } else if current_date == today {
+                    Color::Cyan          // today always pops, even unselected
+                } else if has_any_event {
+                    Color::White         // days with something on them stand out
+                } else if is_weekend {
+                    Color::Blue          // weekends subtly tinted
+                } else if current_date < today {
+                    Color::DarkGray      // past: fade out
+                } else {
+                    Color::Gray          // future empty: neutral
+                };
                 let cell_block = Block::default()
                     .borders(Borders::ALL)
-                    .border_style(if is_conflict && current_date != sel {
-                        Style::default().fg(Color::Red)
-                    } else if current_date == sel {
-                        Style::default().fg(Color::Yellow)
-                    } else {
-                        Style::default().fg(Color::DarkGray)
-                    })
+                    .border_style(Style::default().fg(border_color))
                     .title(title);
 
                 f.render_widget(
