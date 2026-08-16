@@ -699,11 +699,15 @@ fn draw_month_calendar(f: &mut ratatui::Frame, state: &AppState, area: ratatui::
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(border_color));
 
+                // Render the border block first
+                f.render_widget(cell_block, cols[c]);
+
+                // Render the filled/styled paragraph inside the border
+                let inner_area = cols[c].inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
                 f.render_widget(
                     Paragraph::new(Line::from(spans))
-                        .block(cell_block)
                         .style(cell_style),
-                    cols[c],
+                    inner_area,
                 );
 
                 current_date = current_date.succ_opt().unwrap_or(current_date);
